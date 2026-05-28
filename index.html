@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Жареная кукуруза — анализ категории</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.55; color: #111827;
+      max-width: 1240px; margin: 0 auto; padding: 32px 28px;
+      background: #f6f7f9;
+    }
+    h1 { font-size: 34px; margin: 0 0 4px; letter-spacing: -0.01em; }
+    h2 {
+      font-size: 22px; margin: 56px 0 16px;
+      padding-bottom: 10px; border-bottom: 2px solid #e5e7eb;
+      letter-spacing: -0.01em;
+    }
+    h3 { font-size: 17px; margin-top: 28px; color: #374151; }
+    h4 { font-size: 15px; margin: 18px 0 8px; color: #1f2937; }
+    .subtitle { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+
+    /* TL;DR блок с вердиктом */
+    .tldr {
+      background: #eff6ff; border-left: 4px solid #2563eb;
+      padding: 20px 24px; border-radius: 6px; margin: 20px 0;
+    }
+    .tldr.warning { background: #fffbeb; border-left-color: #f59e0b; }
+    .tldr.danger  { background: #fef2f2; border-left-color: #dc2626; }
+    .tldr.ok      { background: #ecfdf5; border-left-color: #10b981; }
+    .verdict { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+
+    /* KPI-дашборд — верхняя шапка */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px; margin: 24px 0 32px;
+    }
+    .kpi {
+      background: white; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 14px 16px;
+      position: relative; overflow: hidden;
+    }
+    .kpi .label {
+      font-size: 11px; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+    .kpi .value {
+      font-size: 26px; font-weight: 700; color: #111827;
+      font-variant-numeric: tabular-nums; line-height: 1.1;
+    }
+    .kpi .unit { font-size: 14px; font-weight: 500; color: #6b7280; margin-left: 2px; }
+    .kpi .sub { font-size: 11px; color: #6b7280; margin-top: 4px; min-height: 14px; }
+    .kpi.good   { border-left: 3px solid #10b981; }
+    .kpi.warn   { border-left: 3px solid #f59e0b; }
+    .kpi.danger { border-left: 3px solid #dc2626; }
+    .kpi.good .value   { color: #059669; }
+    .kpi.warn .value   { color: #d97706; }
+    .kpi.danger .value { color: #b91c1c; }
+
+    /* Таблицы */
+    table {
+      width: 100%; border-collapse: collapse;
+      margin: 12px 0; background: white; font-size: 13px;
+      border-radius: 6px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #f1f2f4; }
+    th {
+      background: #f9fafb; font-weight: 600; cursor: pointer;
+      user-select: none; color: #374151; white-space: nowrap;
+    }
+    th:hover { background: #f1f2f4; }
+    /* Индикаторы сортировки */
+    th::after {
+      content: " ⇅"; color: #cbd5e1; font-size: 11px; font-weight: 400;
+      margin-left: 2px; transition: color 0.15s;
+    }
+    th:hover::after { color: #64748b; }
+    th.sort-asc::after  { content: " ▲"; color: #2563eb; font-size: 10px; }
+    th.sort-desc::after { content: " ▼"; color: #2563eb; font-size: 10px; }
+    /* Колонки, которые не имеет смысла сортировать */
+    th.no-sort { cursor: default; }
+    th.no-sort::after { content: ""; }
+    th.no-sort:hover { background: #f9fafb; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.newbie { background: #ecfdf5; }
+
+    /* Бейджи и source-теги */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge.new  { background: #10b981; color: white; }
+    .badge.warn { background: #f59e0b; color: white; }
+    .badge.info { background: #3b82f6; color: white; }
+    .source-tag {
+      font-size: 10px; color: #9ca3af;
+      text-transform: uppercase; margin-left: 4px;
+    }
+    .source-tag.data   { color: #059669; }
+    .source-tag.calc   { color: #2563eb; }
+    .source-tag.hyp    { color: #d97706; }
+    .source-tag.expert { color: #7c3aed; }
+    .source-tag.default { color: #6b7280; }
+
+    /* Графики и карточки */
+    .chart-wrap {
+      background: white; border-radius: 8px;
+      padding: 12px 16px 16px; margin: 16px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .chart-title {
+      font-size: 14px; font-weight: 600; color: #111827;
+      margin: 0 0 8px; padding-right: 120px; /* место под modebar */
+    }
+    .chart {
+      background: white; border-radius: 8px;
+      min-height: 320px;
+    }
+    /* Standalone .chart (без wrap) — legacy */
+    .chart:not(.chart-wrap .chart) {
+      padding: 16px; margin: 16px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      min-height: 360px;
+    }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img.thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+
+    .kv { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #f1f2f4; }
+    .kv:last-child { border-bottom: none; }
+    .kv .k { color: #6b7280; font-size: 13px; }
+    .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .kv .v.pos { color: #059669; }
+    .kv .v.neg { color: #dc2626; }
+
+    /* Сегменты фасовок — плитка */
+    .segments-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px; margin: 12px 0;
+    }
+    .segment-card {
+      background: white; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .segment-card.best {
+      border-color: #10b981; background: #f0fdf4;
+      border-width: 2px;
+    }
+    .segment-card .seg-name {
+      font-size: 12px; text-transform: uppercase;
+      color: #6b7280; letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+    .segment-card .seg-range { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    .segment-card .seg-metric { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+    .segment-card .seg-metric .mk { color: #6b7280; }
+    .segment-card .seg-metric .mv { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .footer {
+      margin-top: 64px; padding-top: 24px;
+      border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;
+    }
+    .footer ul { padding-left: 20px; }
+
+    /* Dynamics секция */
+    .dynamics-grid { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+    .dynamics-block { flex: 1; min-width: 360px; }
+    .dynamics-block table { width: 100%; }
+    .delta-good { color: #166534; font-weight: 600; }
+    .delta-bad  { color: #991b1b; font-weight: 600; }
+    .interpretation { font-size: 13px; color: #4b5563; margin-top: 8px; font-style: italic; }
+
+    /* Alert плашки */
+    .alert-info    { padding: 10px; border-radius: 6px; background: #dbeafe; color: #1e40af; }
+    .alert-warning { padding: 10px; border-radius: 6px; background: #fef3c7; color: #92400e; }
+    .alert-danger  { padding: 10px; border-radius: 6px; background: #fee2e2; color: #991b1b; }
+
+    /* ⭐ Commentary blocks — under each HTML section */
+    .commentary {
+      background: #f8fafc; border-left: 3px solid #94a3b8;
+      padding: 12px 16px; margin: 16px 0 24px;
+      font-style: italic; color: #475569; font-size: 14px;
+    }
+    .commentary::before { content: "🧠 "; font-style: normal; }
+    .commentary p { margin: 6px 0; }
+    .commentary:empty { display: none; }
+
+    /* ⭐ VoC tiles — 3 плитки в блоке Голос покупателя */
+    .voc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 16px 0; }
+    .voc-tile { background: white; padding: 16px; border-radius: 6px; border: 1px solid #e2e8f0; }
+    .voc-tile h4 { margin: 0 0 8px; font-size: 14px; }
+    .voc-tile ul { margin: 0; padding-left: 18px; font-size: 13px; }
+    .voc-tile li { margin-bottom: 4px; }
+    @media (max-width: 768px) { .voc-grid { grid-template-columns: 1fr; } }
+
+    /* ⭐ Segment cards — обогащённая фасовка */
+    .seg-label { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+    .seg-stats .kv { padding: 4px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; }
+    .seg-stats .kv:last-child { border-bottom: none; }
+    .seg-stats .k { color: #666; font-size: 12px; }
+    .seg-stats .v { font-weight: 600; font-size: 13px; }
+    .seg-badge { margin-top: 8px; color: #10b981; font-size: 12px; font-weight: 600; }
+
+    /* Печать */
+    @media print {
+      body { background: white; max-width: none; padding: 12mm; }
+      .chart, .kpi, table, .segment-card { box-shadow: none; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Жареная кукуруза</h1>
+  <div class="subtitle">Период: 2026-03-01 – 2026-05-26 (2.90 мес, 87 дн) · Обновлено: 2026-05-28T07:00:27 · Методология v1.5</div>
+</header>
+
+<!-- 0. KPI-шапка: 6 карточек с ключевыми цифрами -->
+<div class="kpi-grid"><div class="kpi warn"><div class="label">Оборот категории / мес</div><div class="value">1.6<span class="unit"> млн ₽</span></div><div class="sub">Ozon 1.2 + WB 0.3 млн</div></div>
+<div class="kpi good"><div class="label">Медиана цены (500 г)</div><div class="value">621<span class="unit"> ₽</span></div><div class="sub">Ozon 621 · WB 393</div></div>
+<div class="kpi danger"><div class="label">Концентрация топ-10</div><div class="value">84<span class="unit">%</span></div><div class="sub">Ozon 62% · WB 84%</div></div>
+<div class="kpi good"><div class="label">Плановая себест. (500 г)</div><div class="value">330<span class="unit"> ₽</span></div><div class="sub">Ozon 330 ₽ · WB 361 ₽ · цель 20% маржа</div></div>
+<div class="kpi danger"><div class="label">Живые SKU</div><div class="value">24<span class="unit">%</span></div><div class="sub">Ozon 32% · WB 17%</div></div></div>
+
+<!-- 1a. Динамика периодов (опционально; пусто при single-period) -->
+<div id="section-dynamics"><h2>Динамика периодов</h2><div class="dynamics-grid"><div class="dynamics-block"><h3>Ozon</h3><table><thead><tr><th>Метрика</th><th>2025-12-01..2026-02-28</th><th>2026-03-01..2026-05-26</th><th class="num">Δ %</th></tr></thead><tbody><tr><td>Выручка категории, ₽/мес</td><td class="num">1 141 511 ₽</td><td class="num">1 237 054 ₽</td><td class="num delta-good">+8.4%</td></tr><tr><td>Median price (эталон), ₽</td><td class="num">634 ₽</td><td class="num">621 ₽</td><td class="num delta-bad">-2.1%</td></tr><tr><td>SKU с продажами, шт</td><td class="num">35</td><td class="num">50</td><td class="num delta-good">+42.9%</td></tr><tr><td>Концентрация топ-10, %</td><td class="num">92.1%</td><td class="num">62.1%</td><td class="num delta-good">-32.6%</td></tr><tr><td>Новичков в топ-30, шт</td><td class="num">22</td><td class="num">22</td><td class="num ">0%</td></tr></tbody></table><p class="interpretation"><em>Ozon в категории растёт: выручка +8,4% между периодами, число активных SKU выросло с 35 до 50 (+42,9%), а концентрация топ-10 упала с 92,1% до 62,1% — рынок открывается для новых игроков. Медианная цена эталона снизилась с 634 ₽ до 621 ₽ (-2,1%) — давление со стороны новичков (КРУГ ТЕПЛА, Double Crunch, Aldea Snacks), которые ворвались с продуктом на 500–600 ₽. Окно входа на Ozon реально, но конкуренция за внимание ужесточится во втором полугодии.</em></p></div><div class="dynamics-block"><h3>Wildberries</h3><table><thead><tr><th>Метрика</th><th>2025-12-01..2026-02-28</th><th>2026-03-01..2026-05-26</th><th class="num">Δ %</th></tr></thead><tbody><tr><td>Выручка категории, ₽/мес</td><td class="num">483 871 ₽</td><td class="num">347 136 ₽</td><td class="num delta-bad">-28.3%</td></tr><tr><td>Median price (эталон), ₽</td><td class="num">364 ₽</td><td class="num">393 ₽</td><td class="num delta-good">+8.1%</td></tr><tr><td>SKU с продажами, шт</td><td class="num">22</td><td class="num">24</td><td class="num delta-good">+9.1%</td></tr><tr><td>Концентрация топ-10, %</td><td class="num">89.0%</td><td class="num">84.0%</td><td class="num delta-good">-5.6%</td></tr><tr><td>Новичков в топ-30, шт</td><td class="num">6</td><td class="num">6</td><td class="num ">0%</td></tr></tbody></table><p class="interpretation"><em>WB сжимается: выручка категории упала с 484 тыс. ₽/мес до 347 тыс. ₽/мес (-28,3%). Несмотря на формальный рост числа SKU с продажами (22→24) и снижение топ-10 концентрации (89%→84%), реальный объём денег уходит. Медианная цена выросла с 363,5 ₽ до 393 ₽ (+8,1%) — попытка лидера DONA NUTS удержать выручку через цену, но это ускоряет отток покупателей. Новичков в топ-30 стабильно мало (6 шт), и их выручка падает ниже 20 тыс. ₽/мес. WB — это пока стагнирующий вторичный канал, не основной.</em></p></div></div></div>
+<div class="commentary" id="commentary-dynamics">Между двумя периодами площадки расходятся: Ozon идёт вверх (+8,4% выручки, +43% активных SKU, концентрация топ-10 рушится с 92% до 62%), а WB падает (-28% выручки при стабильном числе SKU). Это значит, что окно входа есть только на Ozon — там за зиму ворвалась группа новичков, забравших долю у старого лидера. На WB новичков мало (6 шт), их выручка падает, попытка лидера задрать цену +8% не остановила отток покупателей. Если планировать вход, делать это надо на Ozon: тренд позитивный, но конкуренция ускоряется.</div>
+
+<!-- 2. Глубина рынка -->
+<h2>Глубина рынка</h2>
+<div id="section-depth"><table><thead><tr><th>Метрика</th><th class="num">Ozon</th><th class="num">WB</th></tr></thead><tbody>
+<tr><td>Кол-во SKU</td><td class="num">158</td><td class="num">144</td></tr>
+<tr><td>Живые SKU (с продажами)</td><td class="num">50</td><td class="num">24</td></tr>
+<tr><td>Доля живых SKU</td><td class="num">32</td><td class="num">17</td></tr>
+<tr><td>Выручка/мес, ₽</td><td class="num">1 237 054</td><td class="num">347 136</td></tr>
+<tr><td>Продажи/мес, ед</td><td class="num">2 118</td><td class="num">815</td></tr>
+<tr><td>Концентрация топ-10 %</td><td class="num">62</td><td class="num">84</td></tr>
+<tr><td>Концентрация топ-30 %</td><td class="num">94</td><td class="num">100</td></tr>
+</tbody></table></div>
+<div class="commentary" id="commentary-depth">Рынок мелкий и неравномерный. Ozon: ≈1,24 млн ₽/мес общей выручки, 158 SKU при только 31,6% с продажами (50 живых SKU), 11 живых продавцов из 27 — то есть категория уже работает в режиме «выжившие». Средняя выручка на живой SKU 24,7 тыс. ₽ — это пограничная экономика. WB ещё мельче: 347 тыс. ₽/мес, всего 16,7% SKU с продажами (24 из 144), 7 живых продавцов и средняя выручка 14,5 тыс. ₽ на SKU. Концентрация топ-30 на WB 100% — фактически вся выручка приходится на узкий круг, остальные 120 SKU висят без продаж. Для входа имеет смысл целиться только на Ozon и только в нишу с понятной дифференциацией.</div>
+
+<!-- 2.5. Доли рынка: пироги по продавцам -->
+<h2>Доли рынка (топ-5 продавцов)</h2>
+<div id="section-seller-shares"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"><div class="chart-wrap"><div class="chart-title">Ozon: топ-5 продавцов на фоне рынка</div><div id="seller-share-ozon" class="chart"></div><p style="font-size:12px;color:#6b7280;margin:4px 0 0">Топ-5 продавцов = 71% выручки маркетплейса</p></div><script>Plotly.newPlot("seller-share-ozon",[{type:"pie",labels:["УРАЛЬСКИЙ ЛИДЕР ПЛЮС", "nut.fruit", "КРУГ ТЕПЛА", "Магазин 3662682", "Смарт", "Остальной рынок"],values:[386929.32, 192473.44, 157898.27, 88430.0, 47362.76, 363960.20999999996],textinfo:"percent",textposition:"auto",hovertemplate:"%{label}<br>%{value:,} ₽/мес<br>%{percent}<extra></extra>",marker:{colors:[null, null, null, null, null, "#e5e7eb"],line:{color:"#fff",width:2}}}],{margin:{t:10,b:60,l:10,r:10},showlegend:true,legend:{orientation:"h",y:-0.15,font:{size:11}}},{responsive:true,displaylogo:false,modeBarButtonsToRemove:["lasso2d","select2d"]});</script><div class="chart-wrap"><div class="chart-title">WB: топ-5 продавцов на фоне рынка</div><div id="seller-share-wb" class="chart"></div><p style="font-size:12px;color:#6b7280;margin:4px 0 0">Топ-5 продавцов = 96% выручки маркетплейса</p></div><script>Plotly.newPlot("seller-share-wb",[{type:"pie",labels:["ИП Таджидинов О Х", "ООО Уральский Лидер Плюс", "ИП Кимсанов С Ш", "ИП Исломи С Д", "ООО Снек СПБ", "Остальной рынок"],values:[214648.28, 54712.399999999994, 36236.2, 19635.52, 9204.14, 12699.460000000021],textinfo:"percent",textposition:"auto",hovertemplate:"%{label}<br>%{value:,} ₽/мес<br>%{percent}<extra></extra>",marker:{colors:[null, null, null, null, null, "#e5e7eb"],line:{color:"#fff",width:2}}}],{margin:{t:10,b:60,l:10,r:10},showlegend:true,legend:{orientation:"h",y:-0.15,font:{size:11}}},{responsive:true,displaylogo:false,modeBarButtonsToRemove:["lasso2d","select2d"]});</script></div></div>
+<div class="commentary" id="commentary-shares">Рынок сильно фрагментирован по количеству продавцов, но концентрирован по выручке. На Ozon из 27 продавцов реальные деньги делают 11, и топ-5 забирают 91,3% — лидер «УРАЛЬСКИЙ ЛИДЕР ПЛЮС» (Mr. Cruncher) держит сразу 3 позиции в топ-4 с одной фасовкой 500 г. На WB ещё жёстче: 7 живых продавцов из 41, топ-5 = 98,2%, лидер «ИП Таджидинов О Х» (DONA NUTS) занимает 5 строк топ-10. Это означает, что новичкам приходится отжимать долю не у «длинного хвоста», а у 1–2 крупных игроков, которые уже выстроили рейтинг и отзывы (Mr. Cruncher 4234 отзыва, DONA NUTS 2579 на топ-SKU).</div>
+
+<!-- 3. Фасовка: эталон и сегменты -->
+<h2>Фасовка: эталон и сегменты</h2>
+<div id="section-packaging"><p style="margin:4px 0 16px"><strong>Эталонная фасовка:</strong> <span class="badge info">500 г</span> — 8 SKU из топ-15, 64.8% выручки категории, медиана 621 ₽</p>
+<h3>Ozon</h3>
+<div class="segments-grid"><div class="segment-card">
+  <div class="seg-label">&lt;300 г</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">26 / 1 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">1</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">431 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">732 ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">0.2</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">0.0%</span></div>
+  </div>
+  
+</div><div class="segment-card best">
+  <div class="seg-label">300 г – 1 кг</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">59 / 31 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">4 458</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">2 292 995 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">621 ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">2 229.0</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">67.8%</span></div>
+  </div>
+  <div class="seg-badge">⭐ Эталон</div>
+</div><div class="segment-card">
+  <div class="seg-label">1–3 кг</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">56 / 16 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">1 347</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">1 090 112 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">1 325 ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">1 347.0</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">32.2%</span></div>
+  </div>
+  
+</div><div class="segment-card">
+  <div class="seg-label">&gt;3 кг</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">0 / 0 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">0</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">0 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">— ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">0.0</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">0.0%</span></div>
+  </div>
+  
+</div></div>
+<h3>Wildberries</h3>
+<div class="segments-grid"><div class="segment-card">
+  <div class="seg-label">&lt;300 г</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">23 / 0 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">0</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">0 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">869 ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">0.0</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">0.0%</span></div>
+  </div>
+  
+</div><div class="segment-card best">
+  <div class="seg-label">300 г – 1 кг</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">58 / 12 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">721</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">262 812 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">420 ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">361.2</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">85.4%</span></div>
+  </div>
+  <div class="seg-badge">⭐ Эталон</div>
+</div><div class="segment-card">
+  <div class="seg-label">1–3 кг</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">37 / 6 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">44</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">44 909 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">712 ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">44.0</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">14.6%</span></div>
+  </div>
+  
+</div><div class="segment-card">
+  <div class="seg-label">&gt;3 кг</div>
+  <div class="seg-stats">
+    <div class="kv"><span class="k">SKU</span><span class="v">0 / 0 живых</span></div>
+    <div class="kv"><span class="k">Продажи, шт</span><span class="v">0</span></div>
+    <div class="kv"><span class="k">Выручка</span><span class="v">0 ₽</span></div>
+    <div class="kv"><span class="k">Медиана цены</span><span class="v">— ₽</span></div>
+    <div class="kv"><span class="k">Продано, кг</span><span class="v">0.0</span></div><div class="kv"><span class="k">Доля выручки</span><span class="v">0.0%</span></div>
+  </div>
+  
+</div></div></div>
+<div class="commentary" id="commentary-packaging">Эталон 500 г (8 SKU, 64,8% выручки) выбран как самый ликвидный сегмент — там работают и Mr. Cruncher, и Aldea Snacks, и Круг Тепла, и Double Crunch. На Ozon сегмент 300 г – 1 кг забирает 67,8% выручки, сегмент 1–3 кг — ещё 32,2% (там играет nut.fruit с фасовкой 1 кг за 800–900 ₽, цена за грамм ниже). Малая фасовка &lt;300 г фактически мертва (один SKU, 0,01% выручки). На WB всё ещё проще: 85% выручки в 300 г – 1 кг по медиане 420 ₽, сегмент 1 кг занимает только 14,6%. Если строить ассортимент — старт с 500 г, затем 1 кг как «семейная/под компанию» фасовка для Ozon.</div>
+
+<!-- 5. Голос покупателя + портрет -->
+<h2>Голос покупателя и портрет</h2>
+<div id="section-voc"><section style="margin-bottom:24px"><h3>Голос рынка</h3><div style="display:flex;gap:24px;flex-wrap:wrap;"><div style="flex:1;min-width:320px"><h4>Боли</h4><h4>#1. Пересол — самая массовая жалоба: «слишком солёные», «вкус кукурузы перебивает соль», «все пальцы в соли». Встречается в десятках отзывов с рейтингом 1–3.</h4>
+<h4>#2. Старое или горелое масло и залежалый вкус: «как будто лежали несколько лет», «привкус пережаренного масла», «послевкусие остаётся». Прямо указывает на проблемы с контролем сырья у топ-конкурентов.</h4>
+<h4>#3. Несоответствие заявленному вкусу: «сыром даже не пахнет», «вместо барбекю прислали сырный», «вкус сыра практически отсутствует». Покупатели платят за вкус, получают только соль.</h4></div><div style="flex:1;min-width:320px"><h4>Хотелки</h4><h4>#1. Сбалансированный солёный вкус и яркая вкусовая добавка (барбекю/сыр/чили), которая действительно ощущается, а не маскируется солью.</h4>
+<h4>#2. Стабильное качество: свежее масло без прогорклого привкуса, целые зёрна без жучков, упаковка не порвана при доставке.</h4>
+<h4>#3. Хрустящая текстура без излишней жёсткости — несколько отзывов отмечают «жестковата, для тех у кого жернова во рту»; ценят крупные и не пересушенные зёрна.</h4></div></div><div style="background:#f9fafb;border:1px solid #e5e7eb;padding:16px;border-radius:6px;margin-top:16px"><h4>Портрет покупателя <span class="badge warn">ГИПОТЕЗА</span></h4><p>Основной покупатель — мужчина 25–45, берёт «под пиво» или как солёный перекус, ценит хруст и яркий вкус, но избалован дешёвыми аналогами и быстро ставит низкий рейтинг при пересоле или прогорклом масле. Чувствителен к цене (медиана WB 393 ₽, Ozon 621 ₽).</p></div></section>
+<div class="voc-grid"><div class="voc-tile"><h4>🎯 Кому товар</h4><ul><li>Любители пива и снеков под алкоголь («под пенное», «под пивас»)</li><li>Семейный перекус — родители с детьми, ищущие солёную альтернативу чипсам</li><li>Любители здорового перекуса — позиционирование «белковый перекус, не попкорн» работает у Aldea Snacks</li></ul></div><div class="voc-tile"><h4>🛠 Какую задачу решает</h4><ul><li>Хрустящий солёный снек к пиву и просмотру кино</li><li>Быстрый перекус на работе/в дороге вместо чипсов</li><li>Альтернатива орехам в категории «солёные снеки»</li><li>Разнообразить ассортимент закусок дома («для разнообразия попробовать кукурузу»)</li></ul></div><div class="voc-tile"><h4>💡 Неочевидные сценарии</h4><ul><li>Топпинг к супам и салатам как замена сухарикам</li><li>Гарнир к пиву на компанию (фасовка 1 кг)</li><li>Подарочный/новогодний снек в категории «крафтовые закуски»</li></ul></div></div></div>
+<div class="commentary" id="commentary-voc">Голос покупателя жёсткий и ёмкий: главная боль — пересол, маскирующий и вкус кукурузы, и заявленный «барбекю/сыр». Вторая — горелое или старое масло, прогорклый привкус, ощущение залежалого продукта. Третья — несоответствие заявленному вкусу: «вместо барбекю пришёл сырный», «сыром даже не пахнет». Покупатели хотят сбалансированной соли, ощутимой вкусовой добавки, свежего масла и целых зёрен. Аудитория — взрослые потребители «под пиво» и для семейного перекуса, чувствительные к цене (медиана WB 393 ₽). Низкая достоверность не угрожает: 332 отзыва в выборке, картина устойчивая.</div>
+
+<!-- 7. Юнит-экономика -->
+<h2>Юнит-экономика</h2>
+<div id="section-unit-economics"><div style="display:flex;gap:24px;flex-wrap:wrap;">
+<div style="flex:1;min-width:380px"><h3>Ozon</h3><p style="font-size:12px;color:#6b7280;margin:0 0 8px">На основе фактических данных (Seller24 или медиана конкурентов из MPSTATS)</p><table><thead><tr><th>Параметр</th><th class="num">Брутто</th><th class="num">Соинвест МП</th><th class="num">Net</th></tr></thead><tbody><tr><td>Цена на витрине (500 г), ₽</td><td class="num">621</td><td class="num">—</td><td class="num">—</td></tr><tr><td>Скидка площадки (Ozon-карта/СПП), %</td><td class="num">—</td><td class="num">30 <span class="source-tag default" title="ДЕФОЛТ: method.md §2.9 (дефолт категории продукты) (OZON-карта 30%)">[ДЕФОЛТ]</span></td><td class="num">—</td></tr><tr><td>Комиссия МП, %</td><td class="num">32 <span class="source-tag data" title="ДАННЫЕ: Seller24 → Сводные финансы">[ДАННЫЕ]</span></td><td class="num">−30</td><td class="num">2 <span class="source-tag calc" title="РАСЧЁТ: max(32.5 − 30, 0)">[РАСЧЁТ]</span></td></tr><tr><td>Логистика МП, %</td><td class="num">16 <span class="source-tag data" title="ДАННЫЕ: Seller24">[ДАННЫЕ]</span></td><td class="num">−0</td><td class="num">16 <span class="source-tag calc" title="РАСЧЁТ: каскад соинвеста после комиссии">[РАСЧЁТ]</span></td></tr><tr><td>Внутр. реклама, %</td><td class="num">9 <span class="source-tag data" title="ДАННЫЕ: Seller24">[ДАННЫЕ]</span></td><td class="num">−0</td><td class="num">9 <span class="source-tag calc" title="РАСЧЁТ: каскад соинвеста после комиссии и логистики">[РАСЧЁТ]</span></td></tr><tr><td>Возвраты, %</td><td class="num">0 <span class="source-tag data" title="ДАННЫЕ: Seller24">[ДАННЫЕ]</span></td><td class="num">— (не покрывается)</td><td class="num">0</td></tr><tr><td>Целевая маржа, %</td><td class="num">20 <span class="source-tag default">[ДЕФОЛТ]</span></td><td class="num">—</td><td class="num">20</td></tr><tr style="border-top:2px solid #1f2937;font-weight:700"><td>Сумма удержаний (net)</td><td class="num">—</td><td class="num">—</td><td class="num">47%</td></tr></tbody></table><p style="margin-top:8px"><strong>Плановая себестоимость под 20% маржу:</strong> 330 ₽</p><p style="font-size:12px;color:#6b7280;font-style:italic;margin:4px 0 0">Соинвест маркетплейса (СПП/Озон-карта) каскадно гасит комиссию → логистику → внутреннюю рекламу. Возвраты и целевая маржа от него не зависят.</p></div>
+<div style="flex:1;min-width:380px"><h3>Wildberries</h3><p style="font-size:12px;color:#6b7280;margin:0 0 8px">На основе фактических данных (Seller24 или медиана конкурентов из MPSTATS)</p><table><thead><tr><th>Параметр</th><th class="num">Брутто</th><th class="num">Соинвест МП</th><th class="num">Net</th></tr></thead><tbody><tr><td>Цена на витрине (500 г), ₽</td><td class="num">621</td><td class="num">—</td><td class="num">—</td></tr><tr><td>Скидка площадки (Ozon-карта/СПП), %</td><td class="num">—</td><td class="num">20 <span class="source-tag default" title="ДЕФОЛТ: method.md §2.9 (дефолт категории продукты) (WB-карта 20%)">[ДЕФОЛТ]</span></td><td class="num">—</td></tr><tr><td>Комиссия МП, %</td><td class="num">24 <span class="source-tag data" title="ДАННЫЕ: Seller24 → Сводные финансы">[ДАННЫЕ]</span></td><td class="num">−20</td><td class="num">4 <span class="source-tag calc" title="РАСЧЁТ: max(23.8 − 20, 0)">[РАСЧЁТ]</span></td></tr><tr><td>Логистика МП, %</td><td class="num">16 <span class="source-tag data" title="ДАННЫЕ: Seller24">[ДАННЫЕ]</span></td><td class="num">−0</td><td class="num">16 <span class="source-tag calc" title="РАСЧЁТ: каскад соинвеста после комиссии">[РАСЧЁТ]</span></td></tr><tr><td>Внутр. реклама, %</td><td class="num">2 <span class="source-tag data" title="ДАННЫЕ: Seller24">[ДАННЫЕ]</span></td><td class="num">−0</td><td class="num">2 <span class="source-tag calc" title="РАСЧЁТ: каскад соинвеста после комиссии и логистики">[РАСЧЁТ]</span></td></tr><tr><td>Возвраты, %</td><td class="num">0 <span class="source-tag data" title="ДАННЫЕ: Seller24">[ДАННЫЕ]</span></td><td class="num">— (не покрывается)</td><td class="num">0</td></tr><tr><td>Целевая маржа, %</td><td class="num">20 <span class="source-tag default">[ДЕФОЛТ]</span></td><td class="num">—</td><td class="num">20</td></tr><tr style="border-top:2px solid #1f2937;font-weight:700"><td>Сумма удержаний (net)</td><td class="num">—</td><td class="num">—</td><td class="num">42%</td></tr></tbody></table><p style="margin-top:8px"><strong>Плановая себестоимость под 20% маржу:</strong> 361 ₽</p><p style="font-size:12px;color:#6b7280;font-style:italic;margin:4px 0 0">Соинвест маркетплейса (СПП/Озон-карта) каскадно гасит комиссию → логистику → внутреннюю рекламу. Возвраты и целевая маржа от него не зависят.</p></div>
+</div></div>
+<div class="commentary" id="commentary-unit-econ">По соинвесту юнит-экономика терпимая, но не комфортная. На Ozon при медиане 621 ₽ и фактической комиссии 32,5% (Seller24) после применения карты Ozon 30% остаётся net-комиссия всего 2,5% — плюс логистика 15,6%, внутренняя реклама 8,7%, возвраты 0,1%. Плановая себестоимость для маржи 20% — 330 ₽. На WB при той же витрине 621 ₽ и СПП 20% net-комиссия 3,8% (комиссия 23,8%), логистика 15,6%, внутренняя реклама всего 2,4% — плановая себестоимость 361 ₽. Главные риски: рост рекламного давления на Ozon (8,7% — это уже выше нормы для FMCG) и комиссия 32,5% — выше средней по продуктовой нише; если СПП/Ozon-карта изменятся, маржа просядет быстро.</div>
+
+<!-- 7.5. TL;DR с вердиктом (перед рекомендациями) -->
+<h2>Итоговая оценка</h2>
+<div class="tldr warning">
+  <div class="verdict">Заходить с условиями</div>
+  <div><div class="alert alert-warning" style="margin-bottom:12px">Рынок сжимается на 28.3% за наблюдаемый период</div><p>Категория «жареная кукуруза» — мелкая ниша (Ozon ≈1,24 млн ₽/мес, WB ≈347 тыс. ₽/мес) с экстремальной концентрацией: топ-5 продавцов забирают 91% выручки на Ozon и 98% на WB. На WB рынок за последний период просел на 28%, лидер DONA NUTS продолжает доминировать. На Ozon заметна ротация: «УРАЛЬСКИЙ ЛИДЕР ПЛЮС» (Mr. Cruncher) удерживает топ, но за 3 месяца ворвались Aldea Snacks, КРУГ ТЕПЛА, Double Crunch — концентрация топ-10 упала с 92% до 62%. Юнит-экономика по соинвесту терпимая (план себестоимости 330 ₽ на Ozon и 361 ₽ на WB при марже 20%), но низкие средние чеки и засилье негативных отзывов про «пересолено / горелое масло / залежалое» делают вход рискованным: без чёткой дифференциации продукта (вкус, помол, контроль качества масла) шансов отжать долю мало.</p></div>
+</div>
+
+<!-- 8. Красные флаги -->
+<h2>Красные флаги</h2>
+<div id="section-recommendations"><div class="tldr danger"><ul><li>Концентрация топ-5 продавцов на OZON 91% — высокий риск входа</li><li>Концентрация топ-5 продавцов на WB 98% — высокий риск входа</li></ul><div class="commentary" style="margin-top:12px;padding:10px 12px;background:#fef2f2;border-left:3px solid #dc2626;font-size:14px;color:#374151">Самый критичный флаг — двойная концентрация: 91% выручки Ozon у 5 продавцов и 98% на WB. Это не «длинный хвост, где можно тихо вырасти», а олигополия, где любой новичок воюет напрямую с лидером. Второй сигнал — сжатие WB на 28,3% при попытке лидера задрать цену: рынок физически сжимается, а не просто перераспределяется. Эти флаги связаны: на падающем рынке с экстремальной концентрацией мелкие игроки выдавливаются быстрее, и расходы на рекламу для удержания позиций будут расти. Третий момент — масса негативных отзывов на топ-SKU (пересол, прогорклое масло) даёт окно для дифференциации, но не отменяет того, что для пробития потребуется бюджет на трафик и серьёзная работа над карточкой. Необратимых флагов нет, но входить без понятной USP — почти гарантированно слить рекламный бюджет.</div></div></div>
+
+<p class="deep-hint" style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">
+  Нужно копнуть глубже — вызови <code>/deep &lt;папка&gt; [вопрос]</code>.
+</p>
+
+<!-- 8.5. Спецоценка: переработать остатки сырой чулпи (1.5 т) в жареную кукурузу -->
+<section class="deep-dive" id="section-chulpi-special">
+  <h2>Спецоценка: пожарить остатки чулпи (1,5 т сырья) и продать как жареную кукурузу</h2>
+
+  <div class="tldr warning">
+    <div class="verdict">Вердикт: заходить ОСТОРОЖНО — только если сырьё уже почти списано</div>
+    <p style="margin:8px 0 0">
+      Из 1,5 т сырой чулпи получится <strong>~975–1 125 кг</strong> жареного продукта <span class="source-tag hyp">[ГИПОТЕЗА]</span> —
+      это <strong>~1 950–2 250 пачек по 500 г</strong> <span class="source-tag calc">[РАСЧЁТ]</span>, что эквивалентно
+      <strong>~1,2 млн ₽ валовой выручки</strong> при медиане Ozon 621 ₽ <span class="source-tag calc">[РАСЧЁТ]</span>.
+      Юнит-экономика категории терпимая (план себестоимости 330 ₽, маржа 20% при 621 ₽ — выполнима), но
+      главный риск — <strong>срок реализации</strong>: даже при агрессивных темпах 3 SKU × 100 шт/мес весь объём уходит
+      за <strong>~7 месяцев</strong>, что упирается в типичный срок годности жареной кукурузы (6–12 мес).
+      Заход имеет смысл только при условии: (1) сырьё рассматривается как «sunk cost» (нет смысла выкидывать),
+      (2) есть готовая декларация ТР ТС 021/2011 или возможность получить её за 2–3 недели,
+      (3) минимум 2–3 SKU с разными вкусами для распараллеливания продаж,
+      (4) категорийная экспертиза: уже есть жарочное и фасовочное оборудование (или договорённость с давальцем).
+    </p>
+  </div>
+
+  <h3>1. Сколько готового продукта получится из 1,5 т сырья</h3>
+  <div class="kpi-grid">
+    <div class="kpi warn">
+      <div class="label">Сырьё на складе</div>
+      <div class="value">1 500<span class="unit"> кг</span></div>
+      <div class="sub">сырая чулпи <span class="source-tag data">[ДАННЫЕ]</span></div>
+    </div>
+    <div class="kpi warn">
+      <div class="label">Усушка при жарке</div>
+      <div class="value">25–35<span class="unit">%</span></div>
+      <div class="sub">потеря влаги <span class="source-tag hyp">[ГИПОТЕЗА]</span></div>
+    </div>
+    <div class="kpi good">
+      <div class="label">Жареный продукт</div>
+      <div class="value">975–1 125<span class="unit"> кг</span></div>
+      <div class="sub">среднее ~1 050 кг <span class="source-tag calc">[РАСЧЁТ]</span></div>
+    </div>
+    <div class="kpi good">
+      <div class="label">SKU при 500 г</div>
+      <div class="value">~2 100<span class="unit"> шт</span></div>
+      <div class="sub">1 950–2 250 пачек <span class="source-tag calc">[РАСЧЁТ]</span></div>
+    </div>
+  </div>
+
+  <h3>2. Какая упаковка — по данным категории</h3>
+  <table>
+    <thead>
+      <tr>
+        <th class="no-sort">Сценарий</th>
+        <th class="no-sort">Источник</th>
+        <th class="num">Цена, ₽</th>
+        <th class="num">Шт из 1 050 кг</th>
+        <th class="num">Валовая выручка</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Упаковка <strong>500 г</strong> (эталон по продажам категории)</td>
+        <td>builder.py reference, 64,8% выручки <span class="source-tag data">[ДАННЫЕ]</span></td>
+        <td class="num">621</td>
+        <td class="num">~2 100</td>
+        <td class="num">~1,30 млн ₽</td>
+      </tr>
+      <tr>
+        <td>Упаковка <strong>1 кг</strong> (оптимальная цена за грамм)</td>
+        <td>builder.py optimal_segment <span class="source-tag data">[ДАННЫЕ]</span></td>
+        <td class="num">828</td>
+        <td class="num">~1 050</td>
+        <td class="num">~0,87 млн ₽</td>
+      </tr>
+      <tr class="newbie">
+        <td><strong>Микс 60/40</strong> (рекомендуем: 60% в 500 г, 40% в 1 кг)</td>
+        <td>стратегия из рекомендаций отчёта <span class="source-tag calc">[РАСЧЁТ]</span></td>
+        <td class="num">621 / 828</td>
+        <td class="num">~1 260 + ~420</td>
+        <td class="num">~1,13 млн ₽</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="interpretation">
+    <em>Эталон 500 г — самый ликвидный формат: на нём играют все успешные новички (Aldea Snacks, КРУГ ТЕПЛА,
+    Double Crunch). Сегмент 1 кг работает на nut.fruit (47–69 шт/мес), цена за грамм ниже. Стартовать
+    разумно с 500 г, а 1 кг добавить как «семейную» фасовку на втором месяце.</em>
+  </p>
+
+  <h3>3. Срок реализации при текущих темпах</h3>
+  <p>
+    Средняя выручка на «живой SKU» в категории Ozon — <strong>24 741 ₽/мес</strong> <span class="source-tag data">[ДАННЫЕ]</span>,
+    что при цене 621 ₽ соответствует <strong>~40 шт/мес на одно SKU</strong> в среднем по рынку <span class="source-tag calc">[РАСЧЁТ]</span>.
+    Реальный диапазон по новичкам категории (из <code>competition.newbies</code>):
+  </p>
+  <ul>
+    <li>Aldea Snacks (Ozon, 500 г, 6 мес на сайте): <strong>138 шт/мес</strong> <span class="source-tag data">[ДАННЫЕ]</span> — потолок для «агрессивного» сценария.</li>
+    <li>КРУГ ТЕПЛА (Ozon, 500 г, 3 мес): <strong>80 шт/мес</strong> <span class="source-tag data">[ДАННЫЕ]</span>.</li>
+    <li>nut.fruit (Ozon, 1 кг): <strong>47–69 шт/мес на SKU</strong> <span class="source-tag data">[ДАННЫЕ]</span>.</li>
+  </ul>
+  <table>
+    <thead>
+      <tr>
+        <th class="no-sort">Сценарий темпа продаж</th>
+        <th class="num">Шт/мес всего</th>
+        <th class="num">Доля выручки Ozon</th>
+        <th class="num">Срок распродажи ~2 100 пачек</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Агрессивный: 3 SKU × 100 шт/мес</td>
+        <td class="num">300</td>
+        <td class="num">~15%</td>
+        <td class="num">~7 мес</td>
+      </tr>
+      <tr>
+        <td>Умеренный: 3 SKU × 50 шт/мес</td>
+        <td class="num">150</td>
+        <td class="num">~7,5%</td>
+        <td class="num">~14 мес</td>
+      </tr>
+      <tr>
+        <td>Медленный: 1–2 SKU × 30 шт/мес</td>
+        <td class="num">40</td>
+        <td class="num">~2%</td>
+        <td class="num">~50+ мес</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="interpretation">
+    <em>Все сроки получены делением расчётного количества пачек на гипотезу темпа продаж <span class="source-tag calc">[РАСЧЁТ]</span>.
+    Агрессивный сценарий требует, чтобы новичок отжал ~15% выручки категории Ozon — это уровень лидера. Реалистично
+    рассчитывать на умеренный сценарий (~14 мес), но это превышает срок годности — значит, надо либо продавать часть
+    оптом (B2B, общепит, мелкий опт через WB FBS), либо принять списание остатков.</em>
+  </p>
+
+  <h3>4. Реалистичная маржа: гипотезы по себестоимости</h3>
+  <p>
+    Юнит-экономика категории (из основного блока отчёта): на Ozon после соинвестов остаётся <strong>~73% витрины</strong> в кассу
+    продавца, то есть <strong>~454 ₽ с 500-г пачки за 621 ₽</strong> <span class="source-tag calc">[РАСЧЁТ]</span>.
+    Плановая себестоимость для маржи 20% — <strong>330 ₽</strong> <span class="source-tag data">[ДАННЫЕ]</span>.
+  </p>
+  <p>Структура себестоимости жарки и фасовки (категорийная экспертиза пищевого производства):</p>
+  <ul>
+    <li>Масло растительное (расход ~10% от сырой массы): <strong>~8 ₽ на 500-г пачку</strong> <span class="source-tag hyp">[ГИПОТЕЗА]</span></li>
+    <li>Специи и соль (1–3% массы): <strong>5–15 ₽</strong> <span class="source-tag hyp">[ГИПОТЕЗА]</span></li>
+    <li>Упаковка (флоупак/дой-пак с принтом): <strong>8–20 ₽</strong> <span class="source-tag hyp">[ГИПОТЕЗА]</span></li>
+    <li>Энергия + амортизация оборудования: <strong>~5–10 ₽</strong> <span class="source-tag hyp">[ГИПОТЕЗА]</span></li>
+    <li>Труд (фасовщик, жарщик с налогами): <strong>~15–25 ₽</strong> <span class="source-tag hyp">[ГИПОТЕЗА]</span></li>
+    <li>Декларация ТР ТС 021/2011 (амортизация на партию 2 100 шт): <strong>~7–20 ₽</strong> <span class="source-tag hyp">[ГИПОТЕЗА]</span></li>
+  </ul>
+  <p>
+    <strong>Итого переработка без сырья: 40–80 ₽ на 500-г пачку</strong> <span class="source-tag calc">[РАСЧЁТ]</span>.
+    Дальше — два сценария оценки маржи:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th class="no-sort">Сценарий учёта сырья</th>
+        <th class="num">С/с 500 г</th>
+        <th class="num">Маржа на пачку</th>
+        <th class="num">Маржа, %</th>
+        <th class="num">Прибыль на всю партию*</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="newbie">
+        <td>Сырьё уже списано (sunk cost = 0 ₽/кг)</td>
+        <td class="num">40–80 ₽</td>
+        <td class="num">~374–414 ₽</td>
+        <td class="num">60–67%</td>
+        <td class="num">~0,79–0,87 млн ₽</td>
+      </tr>
+      <tr>
+        <td>Сырьё по балансовой стоимости (250 ₽/кг сырого)</td>
+        <td class="num">215–255 ₽</td>
+        <td class="num">~199–239 ₽</td>
+        <td class="num">32–38%</td>
+        <td class="num">~0,42–0,50 млн ₽</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:#6b7280;margin-top:-4px">
+    * При условии распродажи всех ~2 100 пачек 500 г на Ozon без потерь и списания <span class="source-tag calc">[РАСЧЁТ]</span>.
+    Балансовая стоимость 250 ₽/кг — пример; подставьте свою фактическую <span class="source-tag hyp">[ГИПОТЕЗА]</span>.
+  </p>
+  <p class="interpretation">
+    <em>Оба сценария проходят выше целевой маржи 20%, заданной методологией. Но «прибыль на партию» — теоретический потолок:
+    реально нужно вычесть бюджет на внешнюю рекламу (5–8% выручки = 60–100 тыс. ₽), расходы на запуск карточек,
+    возможное списание непроданного остатка к концу срока годности (если уйдёт 70%, прибыль = 0,55–0,61 млн ₽
+    в «sunk-cost»-сценарии и 0,30–0,35 млн ₽ в полном).</em>
+  </p>
+
+  <h3>5. Риски</h3>
+  <div class="alert-danger" style="margin-bottom:8px">
+    <strong>Критичные:</strong>
+    <ul style="margin:6px 0 0">
+      <li><strong>Срок годности vs срок реализации.</strong> Жареная кукуруза в герметичной упаковке — обычно 6–12 мес (масло окисляется). Умеренный сценарий продаж (~14 мес) превышает срок годности — часть партии придётся списать или продать оптом.</li>
+      <li><strong>Олигополия категории.</strong> Топ-5 продавцов забирают 91% выручки Ozon и 98% WB <span class="source-tag data">[ДАННЫЕ]</span>. Новичок без USP воюет напрямую с Mr. Cruncher и DONA NUTS — без бюджета на трафик и дифференциации (вкус, помол, свежесть) шансов мало.</li>
+    </ul>
+  </div>
+  <div class="alert-warning" style="margin-bottom:8px">
+    <strong>Существенные:</strong>
+    <ul style="margin:6px 0 0">
+      <li><strong>Декларация соответствия ТР ТС 021/2011.</strong> Обязательна для пищёвки. Срок получения — 1–3 недели, стоимость 15–40 тыс. ₽ <span class="source-tag hyp">[ГИПОТЕЗА]</span>. Без неё ни Ozon, ни WB карточку не пропустят.</li>
+      <li><strong>Упаковочное и жарочное оборудование.</strong> Если нет своего — давалец/контрактная фасовка добавит 30–60% к расчётным затратам на переработку (см. сценарий 80 ₽ на пачку — это с давальцем).</li>
+      <li><strong>Внешняя реклама.</strong> На Ozon внутренние ads уже отъедают 8,7% выручки <span class="source-tag data">[ДАННЫЕ]</span>; добавляйте 5–8% на блогеров/Telegram для пробития ТОП-30.</li>
+      <li><strong>Качество жарки.</strong> Главные жалобы в категории — «пересол», «прогорклое масло», «залежалое» <span class="source-tag data">[ДАННЫЕ]</span>. Если своя линия — нужны калибровка соли (≤1,5%) и свежее масло на каждой партии. Иначе утонете в негативных отзывах.</li>
+    </ul>
+  </div>
+  <div class="alert-info">
+    <strong>Управляемые:</strong>
+    <ul style="margin:6px 0 0">
+      <li>WB лучше пропустить на первом этапе — рынок падает на 28,3% <span class="source-tag data">[ДАННЫЕ]</span>. Только Ozon.</li>
+      <li>Чулпи как сырьё крупнее обычной кукурузы — это можно использовать как USP («гигантская перуанская кукуруза», «не попкорн»). Aldea Snacks уже использует эту идею в названии (Киргизия) — отстройка возможна.</li>
+    </ul>
+  </div>
+
+  <h3>6. Итоговый вердикт</h3>
+  <div class="tldr warning">
+    <div class="verdict" style="color:#92400e">Заходить осторожно — переработать только если сырьё иначе списывается в ноль</div>
+    <p style="margin:8px 0 0">
+      Если 1,5 т сырой чулпи всё равно идут под списание (срок годности на исходе или нет канала сбыта в сыром виде), —
+      <strong>переработка экономически оправдана</strong>: даже в полном сценарии (с учётом стоимости сырья) маржа 32–38% и
+      потолок прибыли ~0,4–0,5 млн ₽ выглядят достижимо. В сценарии «sunk cost» — ещё выше: ~0,8 млн ₽.
+    </p>
+    <p style="margin:8px 0 0">
+      <strong>Но</strong> распродать всё за срок годности реально только при агрессивном входе на Ozon с 2–3 SKU
+      (соль / барбекю / сыр), готовой декларацией, бюджетом на внешнюю рекламу 60–100 тыс. ₽ и работающей
+      производственной цепочкой (жарка → фасовка → склад). Если хоть одно из этих звеньев под вопросом —
+      <strong>лучше продать сырьё оптом</strong> в общепит / на B2B-площадки (мелкий опт даёт хуже за кг, но без рисков
+      производства и без замораживания денег в новой нише на год).
+    </p>
+    <p style="margin:8px 0 0;font-weight:600">
+      Минимально жизнеспособный план: 1 000 пачек 500 г (3 вкуса) → старт на Ozon → KPI первого месяца 80–100 шт/мес/SKU.
+      Если за 2 месяца темп ниже 50 шт/мес/SKU — стопаем, остаток сырья продаём оптом, чтобы не врезаться в срок годности.
+    </p>
+  </div>
+</section>
+
+<!-- 9. Источники -->
+<footer class="footer">
+  <h3>Источники данных и версия методологии</h3>
+  <div><ul>
+<li><strong>Продажи Ozon</strong> (2 файла, периоды: 2025-12-01..2026-02-28; 2026-03-01..2026-05-26)<br><code>Ozon_-_Ниши_Снеки_-_Отчет_по_товарам_01.03.2026-26.05.2026._(27.05.2026).csv</code><br><code>Ozon_-_Ниши_Снеки_-_Отчет_по_товарам_01.12.2025-28.02.2026._(27.05.2026).csv</code></li>
+<li><strong>Продажи WB</strong> (2 файла, периоды: 2025-12-01..2026-02-28; 2026-03-01..2026-05-26)<br><code>Wildberries - Предметы - Овощи сушеные - Отчет по товарам 01.03.2026-26.05.2026. (27.05.2026).csv</code><br><code>Wildberries - Предметы - Овощи сушеные - Отчет по товарам 01.12.2025-28.02.2026. (27.05.2026).csv</code></li>
+<li><strong>Отзывы Ozon</strong> (2 файла)<br><code>Отзывы артикула 1692532101.xlsx</code><br><code>Отзывы артикула 3160268639.xlsx</code></li>
+<li><strong>Отзывы WB</strong> (1 файл)<br><code>Отзывы и ответы артикула 259739782.xlsx</code></li>
+</ul><p>Методология: <code>_shared/knowledge/method.md</code> v1.5</p></div>
+</footer>
+
+<script>
+// Пересчёт размеров Plotly-графиков после финальной раскладки (grid/flex).
+// Без этого inline Plotly.newPlot мог отмерить ширину до того, как CSS-grid
+// разложил карточки, и SVG оказывался шире карточки.
+window.addEventListener("load", () => {
+  if (typeof Plotly === "undefined") return;
+  document.querySelectorAll(".chart").forEach(el => {
+    if (el.querySelector(".js-plotly-plot, .plotly")) {
+      try { Plotly.Plots.resize(el); } catch (e) { /* no-op */ }
+    }
+  });
+});
+
+// JS-сортировка таблиц при клике на th + визуальный индикатор (▲/▼/⇅).
+document.querySelectorAll("table").forEach(table => {
+  const headers = table.querySelectorAll("th");
+  headers.forEach((th, idx) => {
+    if (th.classList.contains("no-sort")) return;
+    let asc = true;
+    th.addEventListener("click", () => {
+      const rows = Array.from(table.querySelectorAll("tbody tr"));
+      rows.sort((a, b) => {
+        const aText = a.children[idx] ? a.children[idx].textContent.trim() : "";
+        const bText = b.children[idx] ? b.children[idx].textContent.trim() : "";
+        const aNum = parseFloat(aText.replace(/[^\d.,-]/g, "").replace(",", "."));
+        const bNum = parseFloat(bText.replace(/[^\d.,-]/g, "").replace(",", "."));
+        const bothNum = !isNaN(aNum) && !isNaN(bNum);
+        const cmp = bothNum ? (aNum - bNum) : aText.localeCompare(bText, "ru");
+        return asc ? cmp : -cmp;
+      });
+      const tbody = table.querySelector("tbody");
+      rows.forEach(r => tbody.appendChild(r));
+      headers.forEach(h => h.classList.remove("sort-asc", "sort-desc"));
+      th.classList.add(asc ? "sort-asc" : "sort-desc");
+      asc = !asc;
+    });
+  });
+});
+</script>
+
+</body>
+</html>
